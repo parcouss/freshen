@@ -2,6 +2,7 @@
 
 import traceback
 import sys
+import re
 
 from freshen.context import ftc, scc
 from freshen.stepregistry import UndefinedStepImpl
@@ -40,6 +41,7 @@ class FreshenTestCase(object):
     django_plugin_started = False
     http_plugin_started = False
     last_step = None
+    re_scenario_outline_values = re.compile('<([^>]+)>')
 
     test_type = "http"
 
@@ -49,8 +51,29 @@ class FreshenTestCase(object):
         self.context = feature_suite
         self.step_registry = step_registry
         self.step_runner = step_runner
+        self._description = None
+        self.show_all_scenario_params = False
 
-        self.description = feature.name + ": " + scenario.name
+    @property
+    def description(self):
+        if not self._description:
+            desc = self.feature.name + ": " + self.scenario.name
+            params = self.scenario.params
+            if not params: return desc
+            keys = self.re_scenario_outline_values.findall(desc)
+            d_params = dict(params)
+            for k in keys:
+                val = d_params.get(k)
+                if val is not None:
+                    desc = desc.replace('<%s>' % k, val)
+            if self.show_all_scenario_params:
+                resulting_params = ['%s=%s' % (p[0], p[1]) for p in params if p[0] not in keys]
+                if resulting_params:
+				    desc = '%s (%s)' % (desc, ','.join(resulting_params))
+            self._description = desc
+        return self._description
+
+    def id(self): return str(self.feature.__class__)
 
     def setUp(self):
         #log.debug("Clearing scenario context")
