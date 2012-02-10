@@ -61,11 +61,12 @@ class Background(object):
 
 class Scenario(object):
 
-    def __init__(self, tags, name, steps):
+    def __init__(self, tags, name, steps, params=None):
         self.tags = tags
         self.name = name
         self.steps = steps
         self.background = None
+        self.params = params
 
     def __repr__(self):
         return '<Scenario "%s">' % self.name
@@ -99,8 +100,8 @@ class ScenarioOutline(Scenario):
             for values in ex.table.iterrows():
                 new_steps = []
                 for step in self.steps:
-                    new_steps.append(step.set_values(values))
-                sc = Scenario(self.tags, self.name, new_steps)
+                    new_steps.append(step.set_values(dict(values)))
+                sc = Scenario(self.tags, self.name, new_steps, values)
                 sc.feature = self.feature
                 sc.background = self.background
                 yield sc
@@ -147,7 +148,7 @@ class Table(object):
 
     def iterrows(self):
         for row in self.rows:
-            yield dict(zip(self.headings, row))
+            yield zip(self.headings, row)
 
 
 def grammar(fname, l, convert=True, base_line=0):

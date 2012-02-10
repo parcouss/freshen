@@ -91,6 +91,13 @@ class FreshenNosePlugin(Plugin):
                           help="Make a report of all undefined steps that "
                                "freshen encounters when running scenarios. "
                                "[NOSE_FRESHEN_LIST_UNDEFINED]")
+        parser.add_option('--scenario-outline-values',
+                          action="store_true",
+                          default=env.get('NOSE_FRESHEN_SCENARIO_OUTLINE_VALUES') == '1',
+                          dest='scenario_outline_values',
+                          help="Display parameters given for a scenario oultine "
+                               "when they are not already present in the scenario "
+                               "description. [NOSE_FRESHEN_SCENARIO_OUTLINE_VALUES]")
 
     def configure(self, options, config):
         super(FreshenNosePlugin, self).configure(options, config)
@@ -105,6 +112,8 @@ class FreshenNosePlugin(Plugin):
             self.undefined_steps = []
         else:
             self.undefined_steps = None
+        self.scenario_outline_values = options.scenario_outline_values
+        self.re_scenario_outline_values = re.compile('<([^>]+)>')
         self._test_class = None
 
     def wantDirectory(self, dirname):
@@ -166,7 +175,15 @@ class FreshenNosePlugin(Plugin):
             if (not indexes or (i + 1) in indexes):
                 if self.tagmatcher.check_match(sc.tags + feat.tags):
                     test_class = self._makeTestClass(feat, sc)
-                    yield test_class(StepsRunner(step_registry), step_registry, feat, sc, ctx)
+                    test = test_class(StepsRunner(step_registry), step_registry, feat, sc, ctx)
+                    # id() is used by the xunit plugin - update it to show scenario outline
+                    # parameters
+                    desc = self._update_scenario_description(sc, test.id())
+                    # I don't want to see freshen.noseplugins in the description
+                    if desc.startswith('freshen.noseplugin.'):
+                        desc = desc[19:]
+                    test.id = lambda: desc
+                    yield test
                     cnt += 1
 
         if not cnt:
@@ -202,9 +219,23 @@ class FreshenNosePlugin(Plugin):
         indexes = set(int(p) for p in parts)
         return (name_without_indexes, indexes)
 
+    def _update_scenario_description(self, scenario, desc):
+        params = scenario.params
+        if not params: return desc
+        keys = self.re_scenario_outline_values.findall(desc)
+        d_params = dict(params)
+        for k in keys:
+            val = d_params.get(k)
+            if val is not None:
+                desc = desc.replace('<%s>' % k, val)
+        if self.scenario_outline_values:
+            resulting_params = ['%s=%s' % (p[0], p[1]) for p in params if p[0] not in keys]
+            desc = '%s (%s)' % (desc, ','.join(resulting_params))
+        return desc
+
     def describeTest(self, test):
         if isinstance(test.test, FreshenTestCase):
-            return test.test.description
+            return self._update_scenario_description(test.test.scenario, test.test.description)
 
     def formatFailure(self, test, err):
         if hasattr(test, 'test') and isinstance(test.test, FreshenTestCase):
