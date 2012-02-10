@@ -3,6 +3,7 @@
 import traceback
 import sys
 import re
+import os
 
 from freshen.context import ftc, scc
 from freshen.stepregistry import UndefinedStepImpl
@@ -56,6 +57,11 @@ class FreshenTestCase(object):
 
     @property
     def description(self):
+        """return a description of the test case.
+        This allow replacement of scenario outline name's.
+        if show_all_scenario_params is enabled, params not
+        present in the name are appended too.
+        """
         if not self._description:
             desc = self.feature.name + ": " + self.scenario.name
             params = self.scenario.params
@@ -73,7 +79,15 @@ class FreshenTestCase(object):
             self._description = desc
         return self._description
 
-    def id(self): return str(self.feature.__class__)
+    def id(self):
+        """return a description for xunit.
+        description is created with folders relative to the current directory
+        and the name of the feature file, then the feature name. All
+        these elements are separated with dots."""
+        pwd = os.getcwd()
+        path = os.path.splitext(self.feature.src_file[len(pwd)+1:])[0]
+        elts = path.split(os.path.sep) + [self.description]
+        return '.'.join(elts)
 
     def setUp(self):
         #log.debug("Clearing scenario context")
