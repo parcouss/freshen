@@ -55,6 +55,11 @@ class FreshenTestCase(object):
         self._description = None
         self.show_all_scenario_params = False
 
+    def package(self):
+        pwd = os.getcwd()
+        path = os.path.splitext(self.feature.src_file[len(pwd)+1:])[0]
+        return path.split(os.path.sep)
+
     @property
     def description(self):
         """return a description of the test case.
@@ -75,7 +80,7 @@ class FreshenTestCase(object):
             if self.show_all_scenario_params:
                 resulting_params = ['%s=%s' % (p[0], p[1]) for p in params if p[0] not in keys]
                 if resulting_params:
-				    desc = '%s (%s)' % (desc, ','.join(resulting_params))
+                    desc = '%s (%s)' % (desc, ','.join(resulting_params))
             self._description = desc
         return self._description
 
@@ -84,10 +89,7 @@ class FreshenTestCase(object):
         description is created with folders relative to the current directory
         and the name of the feature file, then the feature name. All
         these elements are separated with dots."""
-        pwd = os.getcwd()
-        path = os.path.splitext(self.feature.src_file[len(pwd)+1:])[0]
-        elts = path.split(os.path.sep) + [self.description]
-        return '.'.join(elts)
+        return '.'.join(self.package() + [self.description])
 
     def setUp(self):
         #log.debug("Clearing scenario context")
